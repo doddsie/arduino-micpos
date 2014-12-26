@@ -3,7 +3,7 @@
  */
 
 
-var arduinoService = angular.module('arduinoService', ['ngResource']);
+var arduinoService = angular.module('micrcApp', ['ngResource']);
 
 arduinoService.controller('ArduinoController', ['$resource',
     function($resource){

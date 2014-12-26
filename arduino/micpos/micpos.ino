@@ -21,48 +21,58 @@
 // Motor 3
 #define MOTOR_PIN1_Z   4
 #define MOTOR_PIN2_Z   5
+#define MOTOR_PINPWM   6
 
-#define ECHO_X      8  // Arduino pin tied to echo pin on the ultrasonic sensor.
-#define TRIGGER_X   9  // Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_X      11  // Arduino pin tied to echo pin on the ultrasonic sensor.
+#define TRIGGER_X   12  // Adrduino pin tied to trigger pin on the ultrasonic sensor.
 
 #define ECHO_Y      10  // Arduino pin tied to echo pin on the ultrasonic sensor.
 #define TRIGGER_Y   11  // Arduino pin tied to trigger pin on the ultrasonic sensor.
 
-#define ECHO_Z      11  // Arduino pin tied to echo pin on the ultrasonic sensor.
-#define TRIGGER_Z   12  // Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_Z      8  // Arduino pin tied to echo pin on the ultrasonic sensor.
+#define TRIGGER_Z   9  // Arduino pin tied to trigger pin on the ultrasonic sensor.
 
-#define MAX_MOVE_TIME  5000 // Max time in ms that a motor can move
+#define MAX_MOVE_TIME  35000 // Max time in ms that a motor can move
 
 class Motor {
 
     int dirPin1 = 0;
     int dirPin2 = 0;
+    int speed = 75;
+    int pwmPin = 0;
 
   public:
 
-    Motor(int directionPin1, int directionPin2) {
+    Motor(int directionPin1, int directionPin2, int pwmPin = 20) {
       pinMode(directionPin1, OUTPUT);
       pinMode(directionPin2, OUTPUT);
+      pinMode(pwmPin, OUTPUT);
 
       dirPin1 = directionPin1;
       dirPin2 = directionPin2;
+      this->pwmPin = pwmPin;
     }
 
-    void move(boolean forward) {
-      Serial.println("Triggering motor");
-
+    void move(boolean forward, int speed = 255) {
+      analogWrite(pwmPin, speed);
       digitalWrite(dirPin1, (forward) ? LOW : HIGH);
       digitalWrite(dirPin2, (forward) ? HIGH : LOW);
     }
 
-    void moveForward() {
-      move (true);
+    void moveForward(int speed = 255) {
+      move (true, speed);
     }
 
-    void moveBackward() {
-      move(false);
+    void moveBackward(int speed = 255) {
+      move(false, speed);
 
     }
+
+    void setSpeed( int speed) {
+      analogWrite(pwmPin, speed);
+    }
+
+
 
     void stop() {
       digitalWrite(dirPin1, LOW);
@@ -87,7 +97,7 @@ class Slider {
     NewPing* sonar;
 
   public:
-    Slider(Motor* motor, NewPing* sonar, int minDistance = 2, int maxDistance = 300, int divisor = 2 * 29.1) {
+    Slider(Motor* motor, NewPing* sonar, int minDistance = 2, int maxDistance = 600, int divisor = 2 ) {
       this->motor = motor;
       this->sonar = sonar;
       setPosition = getCurrentPosition();
@@ -103,6 +113,7 @@ class Slider {
       movingForward = true;
       startTime = millis();
       setPosition = maxDistance;
+
       motor->moveForward();
     }
 
@@ -142,7 +153,7 @@ class Slider {
     }
 
     int getCurrentPosition() {
-      int timeThereAndBack = sonar->ping_median();
+      int timeThereAndBack = sonar->ping_median(10);
       delay(29);
       return timeThereAndBack / pingDivisor;
     }
@@ -164,19 +175,38 @@ class Slider {
         }
 
         int currentPosition = getCurrentPosition();
-        Serial.print("SetPosition: ");
-        Serial.print(setPosition);
-        Serial.print(" Current Position: ");
-        Serial.println(currentPosition);
+        // Serial.print("SetPosition: ");
+        // Serial.print(setPosition);
+        // Serial.print(" Current Position: ");
+        // Serial.println(currentPosition);
+
+        if (abs(currentPosition - setPosition) < 40) {
+          motor->setSpeed(75);
+        }
 
         if (movingForward && (currentPosition >= setPosition  ||
                               currentPosition >= maxDistance)) {
+
+
+
           motor->stop();
           moving = false;
+          int currentPosition = getCurrentPosition();
+          Serial.print("SetPosition: ");
+          Serial.print(setPosition);
+          Serial.print(" Current Position: ");
+          Serial.println(currentPosition);
+
         } else if (movingForward == false && (currentPosition <= setPosition  ||
                                               currentPosition <= minDistance)) {
           motor->stop();
           moving = false;
+          int currentPosition = getCurrentPosition();
+          Serial.print("SetPosition: ");
+          Serial.print(setPosition);
+          Serial.print(" Current Position: ");
+          Serial.println(currentPosition);
+
         }
       }
     }
@@ -209,7 +239,7 @@ void setup() {
   sonarY = new NewPing(TRIGGER_Y, ECHO_Y, 400);
   sliderY = new Slider(motorY, sonarY);
 
-  motorZ = new Motor(MOTOR_PIN1_Z, MOTOR_PIN2_Z);
+  motorZ = new Motor(MOTOR_PIN1_Z, MOTOR_PIN2_Z, MOTOR_PINPWM);
   sonarZ = new NewPing(TRIGGER_Z, ECHO_Z, 400);
   sliderZ = new Slider(motorZ, sonarZ);
 
@@ -242,13 +272,14 @@ void loop() {
 
     // Close connection and free resources.
     client.stop();
+
   }
 
   sliderX->process();
   sliderY->process();
   sliderZ->process();
-
   delay(50); // Poll every 50ms
+
 
 }
 
@@ -315,7 +346,7 @@ void processRequest(YunClient client) {
   if (command == "status") {
     // processStatus
     Serial.println("Return Status");
-    int currentPosition = sliderX->getCurrentPosition();
+    int currentPosition = sliderZ->getCurrentPosition();
     Serial.print("Slider Position: ");
     Serial.print(currentPosition);
   } else if (command == "move") {
@@ -347,11 +378,8 @@ void processRequest(YunClient client) {
     }
 
     sliderX->moveTo(x);
-    delay(50); // Poll every 50ms
     sliderY->moveTo(y);
-    delay(50); // Poll every 50ms
     sliderZ->moveTo(z);
-    delay(50); // Poll every 50ms
 
     Serial.print("x: ");
     Serial.print(x);
