@@ -23,22 +23,24 @@
 #define MOTOR_PIN2_Z   5
 #define MOTOR_PINPWM   6
 
-#define ECHO_X      11  // Arduino pin tied to echo pin on the ultrasonic sensor.
-#define TRIGGER_X   12  // Adrduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_X      A0  // Arduino pin tied to echo pin on the ultrasonic sensor.
+#define TRIGGER_X   A1  // Adrduino pin tied to trigger pin on the ultrasonic sensor.
 
-#define ECHO_Y      10  // Arduino pin tied to echo pin on the ultrasonic sensor.
-#define TRIGGER_Y   11  // Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_Y      A2  // Arduino pin tied to echo pin on the ultrasonic sensor.
+#define TRIGGER_Y   A3  // Arduino pin tied to trigger pin on the ultrasonic sensor.
 
-#define ECHO_Z      8  // Arduino pin tied to echo pin on the ultrasonic sensor.
-#define TRIGGER_Z   9  // Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_Z      A4  // Arduino pin tied to echo pin on the ultrasonic sensor.
+#define TRIGGER_Z   A5  // Arduino pin tied to trigger pin on the ultrasonic sensor.
 
 #define MAX_MOVE_TIME  35000 // Max time in ms that a motor can move
+#define MAX_SPEED      255
+#define SLOW_SPEED     75
 
 class Motor {
 
     int dirPin1 = 0;
     int dirPin2 = 0;
-    int speed = 75;
+    int speed = SLOW_SPEED;
     int pwmPin = 0;
 
   public:
@@ -53,26 +55,30 @@ class Motor {
       this->pwmPin = pwmPin;
     }
 
-    void move(boolean forward, int speed = 255) {
+    void move(boolean forward, int speed = MAX_SPEED) {
+      this->speed = speed;
       analogWrite(pwmPin, speed);
       digitalWrite(dirPin1, (forward) ? LOW : HIGH);
       digitalWrite(dirPin2, (forward) ? HIGH : LOW);
     }
 
-    void moveForward(int speed = 255) {
+    void moveForward(int speed = MAX_SPEED) {
       move (true, speed);
     }
 
-    void moveBackward(int speed = 255) {
+    void moveBackward(int speed = MAX_SPEED) {
       move(false, speed);
 
     }
 
     void setSpeed( int speed) {
+      this->speed = speed;
       analogWrite(pwmPin, speed);
     }
 
-
+    int   getSpeed() {
+      return speed;
+    }
 
     void stop() {
       digitalWrite(dirPin1, LOW);
@@ -164,24 +170,26 @@ class Slider {
     }
 
     void process() {
+
       if (moving) {
         // Stop if we have gone for TOO long of time.
         if ((millis() - startTime) > MAX_MOVE_TIME) {
           motor->stop();
           moving = false;
-          Serial.println("Stopping - timed out ");
-
           return;
         }
 
         int currentPosition = getCurrentPosition();
+        // Commented out as we do not need it now.
         // Serial.print("SetPosition: ");
         // Serial.print(setPosition);
         // Serial.print(" Current Position: ");
         // Serial.println(currentPosition);
 
-        if (abs(currentPosition - setPosition) < 40) {
-          motor->setSpeed(75);
+
+        // If we are moving at max speed and we are close, then slow down
+        if (motor->getSpeed() == MAX_SPEED && abs(currentPosition - setPosition) < 40) {
+          motor->setSpeed(SLOW_SPEED);
         }
 
         if (movingForward && (currentPosition >= setPosition  ||
