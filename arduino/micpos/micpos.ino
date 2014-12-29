@@ -32,15 +32,17 @@
 #define ECHO_Z      A4  // Arduino pin tied to echo pin on the ultrasonic sensor.
 #define TRIGGER_Z   A5  // Arduino pin tied to trigger pin on the ultrasonic sensor.
 
+// SET THIS TO 1000 WHEN TESTING DIRECTION!!!!!!!
 #define MAX_MOVE_TIME  35000 // Max time in ms that a motor can move
 #define MAX_SPEED      255
 #define SLOW_SPEED     75
+#define SLOW_DISTANCE  50
 
 class Motor {
 
     int dirPin1 = 0;
     int dirPin2 = 0;
-    int speed = SLOW_SPEED;
+    int speed = 0;
     int pwmPin = 0;
 
   public:
@@ -55,7 +57,7 @@ class Motor {
       this->pwmPin = pwmPin;
     }
 
-    void move(boolean forward, int speed = MAX_SPEED) {
+    void move(boolean forward, int speed) {
       this->speed = speed;
       analogWrite(pwmPin, speed);
       digitalWrite(dirPin1, (forward) ? LOW : HIGH);
@@ -160,13 +162,22 @@ class Slider {
 
     int getCurrentPosition() {
       int timeThereAndBack = sonar->ping_median(10);
-      delay(29);
+      delay(29);  // Not sure this is needed
       return timeThereAndBack / pingDivisor;
     }
 
     void stop() {
       motor->stop();
       moving = false;
+    }
+
+    int getSpeed(int currentPosition, int setPosition) {
+
+      if (motor->getSpeed() == MAX_SPEED &&
+          abs(currentPosition - setPosition) < SLOW_DISTANCE) {
+        return SLOW_SPEED;
+      }
+      return MAX_SPEED;
     }
 
     void process() {
@@ -188,9 +199,8 @@ class Slider {
 
 
         // If we are moving at max speed and we are close, then slow down
-        if (motor->getSpeed() == MAX_SPEED && abs(currentPosition - setPosition) < 40) {
-          motor->setSpeed(SLOW_SPEED);
-        }
+        motor->setSpeed(getSpeed(currentPosition, setPosition));
+
 
         if (movingForward && (currentPosition >= setPosition  ||
                               currentPosition >= maxDistance)) {
@@ -233,6 +243,11 @@ Slider* sliderX;
 Slider* sliderY;
 Slider* sliderZ;
 
+
+// These are for calculating how many loops we process in a second
+long rateStartTime = 0L;
+long loopCount = 0L;
+
 // Listen on default port 5555, the webserver on the Yún
 // will forward there all the HTTP requests for us.
 YunServer server;
@@ -264,6 +279,8 @@ void setup() {
 
   // initialize serial communication:
   Serial.begin(9600);
+
+  rateStartTime = millis();
 }
 
 void loop() {
@@ -273,30 +290,23 @@ void loop() {
 
   // There is a new client?
   if (client) {
-    Serial.println("http request");
 
     // Process request
     processRequest(client);
 
     // Close connection and free resources.
     client.stop();
-
   }
 
   sliderX->process();
   sliderY->process();
   sliderZ->process();
-  delay(50); // Poll every 50ms
 
+  loopCount++;
 
-}
-
-
-// THis is not working for some reason???
-int readInt(YunClient client) {
-  int value = client.parseInt();
-  client.read();
-  return value;
+  // Poll every 50ms, might be able to take this out.
+  //We should have enough of a delay with all the processing
+  delay(50);
 }
 
 
@@ -333,9 +343,26 @@ void processMove(YunClient client, String subCommand) {
   }
 }
 
+void outputClientStatus(YunClient client) {
+  char buf[64];
+  char digit[10];
+  float loopRate = loopCount / ((rateStartTime - millis()) / 1000);
+  dtostrf(loopRate,4,2, digit);
+  rateStartTime = millis();
+  loopCount = 0;
 
+  client.println("HTTP/1.1 200 OK");
+  client.println("Status: 200");
+  client.println("Content-type: application/json; charset=utf-8");
+  client.println(); //mandatory blank line
+  sprintf(buf, "{\"rate\":\"%s\",\"x\":\"%d\",\"y\":\"%d\",\"z\":\"%d\" }",
+          digit,
+          sliderX->getCurrentPosition(), sliderY->getCurrentPosition(), sliderZ->getCurrentPosition());
 
+  client.print(buf);
+}
 
+//dtostrf
 /**
 /status - returns status of the sensors
 /move/{left|right|up|down|in|out}
@@ -350,13 +377,8 @@ void processRequest(YunClient client) {
   command.trim();
   Serial.println("Processing: " + command);
 
-  // is "digital" command?
   if (command == "status") {
-    // processStatus
-    Serial.println("Return Status");
-    int currentPosition = sliderZ->getCurrentPosition();
-    Serial.print("Slider Position: ");
-    Serial.print(currentPosition);
+    outputClientStatus(client);
   } else if (command == "move") {
 
     String subCommand = client.readStringUntil('/');
@@ -371,7 +393,6 @@ void processRequest(YunClient client) {
 
   } else if (command == "stop") {
     sliderX->stop();
-
   } else if (command == "setpos") {
     int x = 0;
     int y = 0;
@@ -388,13 +409,6 @@ void processRequest(YunClient client) {
     sliderX->moveTo(x);
     sliderY->moveTo(y);
     sliderZ->moveTo(z);
-
-    Serial.print("x: ");
-    Serial.print(x);
-    Serial.print( " y: ");
-    Serial.print(y);
-    Serial.print( " z: ");
-    Serial.println(z);
   }
 
 

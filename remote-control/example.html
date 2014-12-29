@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" ng-app="arduApp">
+<head>
+    <meta charset="utf-8">
+
+    <title>AngularJS / Arduino</title>
+    <meta name="viewport" content="width=device-width">
+
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+    <script src="http://code.angularjs.org/1.2.6/angular.min.js"></script>
+
+</head>
+
+<script>
+
+    var app = angular.module('arduApp', [])
+
+    function ArduinoCtrl($scope, $http)
+    {
+
+        // get the temperature in JSON format
+        $scope.getJSONTemp = function() {
+
+            $scope.temperature = null;
+
+            $http.get("proxy.php?url=http://192.168.1.165/arduino/getTemp")
+                    .success(function(data) {
+
+                        $scope.temperature = data.temperature;
+                    });
+
+
+        }
+
+        // Send mail to your GMAIL account with the temperature
+        $scope.sendTemp = function() {
+
+            $scope.temperature = null;
+            $scope.sending = true;
+
+            $http.get("proxy.php?url=http://192.168.1.165/arduino/sendTemp")
+                    .success(function(data) {
+
+                        $scope.sending = false;
+                        alert("email sent")
+                    });
+
+        }
+
+    }
+
+</script>
+
+<body>
+<div ng-controller="ArduinoCtrl" class="container">
+
+    <h2>Arduino YUN and AngularJS</h2>
+    <h3>Temperature, Temboo and GMAIL</h3>
+
+    <hr>
+    <button ng-click="getJSONTemp()" class="btn btn-primary">Get Temperature</button>
+    <hr>
+    <button ng-click="sendTemp()" class="btn btn-primary">Send MAIL with Temperature</button>
+
+    <h1 ng-show="temperature">C°</h1>
+    <h2 ng-show="sending">Sending email. Please wait few seconds...</h2>
+
+</div>
+</body>
+</html>
