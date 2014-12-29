@@ -94,9 +94,9 @@ class Motor {
 class Slider {
 
     int setPosition = 0;
-    int minDistance = 10;
-    int maxDistance = 400;
-    int pingDivisor = 2;
+    int minDistance;
+    int maxDistance;
+    int pingDivisor;
     long startTime = 0;
     boolean movingForward = true;
     boolean moving = false;
@@ -113,7 +113,6 @@ class Slider {
       this->maxDistance = maxDistance;
       this->pingDivisor = divisor;
     }
-
 
     // Sets position to the max value.
     void moveForward() {
@@ -181,7 +180,6 @@ class Slider {
     }
 
     void process() {
-
       if (moving) {
         // Stop if we have gone for TOO long of time.
         if ((millis() - startTime) > MAX_MOVE_TIME) {
@@ -197,15 +195,12 @@ class Slider {
         // Serial.print(" Current Position: ");
         // Serial.println(currentPosition);
 
-
         // If we are moving at max speed and we are close, then slow down
         motor->setSpeed(getSpeed(currentPosition, setPosition));
 
 
         if (movingForward && (currentPosition >= setPosition  ||
                               currentPosition >= maxDistance)) {
-
-
 
           motor->stop();
           moving = false;
@@ -230,7 +225,6 @@ class Slider {
     }
 };
 
-
 NewPing* sonarX ;
 NewPing* sonarY ;
 NewPing* sonarZ ;
@@ -242,7 +236,6 @@ Motor* motorZ;
 Slider* sliderX;
 Slider* sliderY;
 Slider* sliderZ;
-
 
 // These are for calculating how many loops we process in a second
 long rateStartTime = 0L;
@@ -285,6 +278,8 @@ void setup() {
 
 void loop() {
 
+  loopCount++;
+
   // Get clients coming from server
   YunClient client = server.accept();
 
@@ -301,8 +296,6 @@ void loop() {
   sliderX->process();
   sliderY->process();
   sliderZ->process();
-
-  loopCount++;
 
   // Poll every 50ms, might be able to take this out.
   //We should have enough of a delay with all the processing
@@ -362,7 +355,6 @@ void outputClientStatus(YunClient client) {
   client.print(buf);
 }
 
-//dtostrf
 /**
 /status - returns status of the sensors
 /move/{left|right|up|down|in|out}
@@ -410,7 +402,6 @@ void processRequest(YunClient client) {
     sliderY->moveTo(y);
     sliderZ->moveTo(z);
   }
-
 
 }
 
